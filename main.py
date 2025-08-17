@@ -3,10 +3,11 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 import joblib
 import os
+import PyPDF2
 
 # Set up paths
-model_path = "model" 
-label_encoder_path = "label_encoder/label_encoder.pkl" 
+model_path = "model"
+label_encoder_path = "label_encoder/label_encoder.pkl"
 
 tokenizer = None
 model = None
@@ -32,7 +33,7 @@ def predict(text):
     if model is None or label_encoder is None:
         st.error("Model or LabelEncoder not loaded properly!")
         return None
-        
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.eval()
@@ -44,15 +45,25 @@ def predict(text):
         prediction = torch.argmax(output.logits, dim=-1).item()
         return label_encoder.inverse_transform([prediction])[0]
 
-st.title("Documents Classification")
-st.write("Enter text to classify:")
+def extract_text_from_pdf(file):
+    pdf_reader = PyPDF2.PdfReader(file)
+    text = ""
+    for page in pdf_reader.pages:
+        text += page.extract_text() + "\n"
+    return text
 
-text = st.text_area("Your text here:")
+st.title("Documents Classification")
+st.write("Upload a PDF to classify:")
+
+uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
 
 if st.button("Predict"):
-    if text:
-        if model and label_encoder: 
+    if uploaded_file:
+        text = extract_text_from_pdf(uploaded_file)
+        if text.strip():
             label = predict(text)
             st.write("Prediction:", label)
+        else:
+            st.warning("No text could be extracted from the PDF.")
     else:
-        st.warning("Please enter some text.")
+        st.warning("Please upload a PDF file.")
